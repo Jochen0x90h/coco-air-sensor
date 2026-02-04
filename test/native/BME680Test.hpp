@@ -17,7 +17,8 @@ const Sensor_native::Config sensorConfig[] = {
     {10.0f, 1.0f},
 };
 
-// drivers for ButtonsTest
+/// @brief Drivers for BME680Test.
+///
 struct Drivers {
     Loop_native loop;
 

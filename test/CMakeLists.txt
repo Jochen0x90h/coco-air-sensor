@@ -36,9 +36,21 @@ function(board_test TEST BOARD_LIB)
 endfunction()
 
 board_test(BME680Test coco-devboards::native)
-#board_test(BME680Test coco-devboards::stm32c031nucleo)
-#board_test(BME680Test coco-devboards::stm32g431nucleo)
-board_test(BME680Test coco-devboards::stm32g474nucleo)
+#board_test(BME680Test coco-devboards::nucleo-c031c6)
+#board_test(BME680Test coco-devboards::nucleo-g431rb)
+board_test(BME680Test coco-devboards::nucleo-g474re)
 
 board_test(BME680DisplayTest coco-devboards::emu)
-board_test(BME680DisplayTest coco-devboards::stm32g431nucleo)
+board_test(BME680DisplayTest coco-devboards::nucleo-g431rb)
+
+
+
+# test for the official Bosch BME68x Sensor API
+if(NOT ${CMAKE_CROSSCOMPILING})
+    add_executable(BME68x_SensorAPI
+        BME68x_SensorAPI/main.cpp
+        BME68x_SensorAPI/bme68x.c
+        BME68x_SensorAPI/bme68x.h
+        BME68x_SensorAPI/bme68x_defs.h
+    )
+endif()

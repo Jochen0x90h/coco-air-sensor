@@ -8,12 +8,10 @@
 
 namespace coco {
 
-/**
- * Controller for BME680 air sensor connected via I2C or SPI
- * Measures temperature, pressure, humidity and air quality
- * https://github.com/BoschSensortec/BME68x-Sensor-API
- * deprecated: https://github.com/BoschSensortec/BME680_driver
- */
+/// @brief Controller for BME680 air sensor connected via I2C or SPI
+/// Measures temperature, pressure, humidity and air quality
+/// https://github.com/BoschSensortec/BME68x-Sensor-API
+/// deprecated: https://github.com/BoschSensortec/BME680_driver
 class BME680 : public InputDevice {
 public:
     // minimum size of buffer
@@ -69,12 +67,10 @@ public:
         Milliseconds<> heaterDuration;
     };
 
-    /**
-     * Constructor
-     * @param loop event loop
-     * @param buffer transfer buffer of an SPI or I2C device of at least BUFFER_SIZE
-     * @param config config
-     */
+    /// @brief Constructor
+    /// @param loop event loop
+    /// @param buffer transfer buffer of an SPI or I2C device with header capacity of 1 and capacity of BUFFER_SIZE
+    /// @param config config
     BME680(Loop &loop, Buffer &buffer, const Config &config);
     ~BME680() override;
 
@@ -113,9 +109,8 @@ protected:
     uint8_t regCtrlHum;
     uint8_t regGasWait;
 
-    /*
-    * @brief Structure to hold the calibration coefficients
-    */
+    /// @brief Structure to hold the calibration coefficients
+    ///
     struct bme68x_calib_data
     {
         /*! Calibration coefficient for the humidity sensor */

@@ -6,16 +6,17 @@
 #include <coco/StringBuffer.hpp>
 #include <coco/debug.hpp>
 
+
 /*
     This test reads the BME680 air sensor and shows the measured values on a display.
-    See board specific BME680DisplayTest.hpp for how to connect the BME680 module and the display
+    See board specific BME680DisplayTest.hpp for how to connect the BME680 module and the display.
 */
 
 using namespace coco;
 
 
 struct Info {
-    // number of decimals to display (negative to disalbe suppression of trailing zeros)
+    // number of decimals to display (negative to disable suppression of trailing zeros)
     int decimalCount;
 
     // unit of measurement
@@ -30,11 +31,15 @@ constexpr Info infos[] = {
 };
 
 
-Coroutine test(Loop &loop, Buffer &displayBuffer, InputDevice &sensor) {
+Coroutine test(Loop &loop, OutputPort &out, Buffer &displayBuffer, InputDevice &sensor) {
     SSD130x display(displayBuffer, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_FLAGS);
 
-    // reset and initialize display
-    co_await drivers.resetDisplay();
+    // reset display
+    out.set(1, 1);
+    co_await loop.sleep(10ms);
+    out.set(0, 1);
+
+    // initialize display
     co_await display.init();
 
     // clear and enable display
@@ -42,10 +47,14 @@ Coroutine test(Loop &loop, Buffer &displayBuffer, InputDevice &sensor) {
     co_await display.show();
     co_await display.enable();
 
+    float values[4];
+    int sequenceNumber = sensor.get(values);
     while (true) {
+        // wait for new input data (with new sequence number)
+        co_await sensor.untilInput(sequenceNumber);
+
         // get measured values
-        float values[std::size(infos)];
-        int sequenceNumber = sensor.get(values);
+        sequenceNumber = sensor.get(values);
 
         // draw values onto display
         Bitmap bitmap = display.bitmap();
@@ -53,18 +62,17 @@ Coroutine test(Loop &loop, Buffer &displayBuffer, InputDevice &sensor) {
         for (size_t i = 0; i < std::size(infos); ++i) {
             StringBuffer<32> b;
             auto &info = infos[i];
-            b << flt(values[i], info.decimalCount) << info.unit;
+            b << dec(values[i], info.decimalCount) << info.unit;
             bitmap.drawText(0, i * (tahoma8pt1bpp.height + 2), tahoma8pt1bpp, b);
         }
         co_await display.show();
-
-        // wait for new input data (with new sequence number)
-        co_await sensor.untilInput(sequenceNumber);
     }
 }
 
 int main() {
-    test(drivers.loop, drivers.displayBuffer, drivers.sensor);
+    debug::out << "BME680DisplayTest\n";
+
+    test(drivers.loop, drivers.resetPin, drivers.displayBuffer, drivers.sensor);
 
     drivers.loop.run();
 }
