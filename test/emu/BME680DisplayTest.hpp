@@ -1,6 +1,7 @@
 #pragma once
 
 #include <coco/SSD130x.hpp>
+#include <coco/DummyOutputPort.hpp>
 #include <coco/platform/SSD130x_emu.hpp>
 #include <coco/platform/Newline_emu.hpp>
 #include <coco/platform/Sensor_emu.hpp>
@@ -19,14 +20,19 @@ const Sensor_emu::Config sensorConfig[] = {
     {10.0f, 5.0f, 20.0f, 0.5f, -1, "Ω"},
 };
 
-// drivers for ButtonsTest
+/// @brief Drivers for BME680DisplayTest.
+///
 struct Drivers {
     Loop_emu loop;
 
+    // emulated display
     SSD130x_emu displayBuffer{loop, DISPLAY_WIDTH, DISPLAY_HEIGHT};
-    AwaitableCoroutine resetDisplay() {co_return;}
     Newline_emu newline{loop};
 
+    // dummy reset pin
+    DummyOutputPort resetPin;
+
+    // emulated for sensor
     Sensor_emu sensor{loop, sensorConfig, 100};
 };
 

@@ -40,31 +40,36 @@ Awaitable<Device::Events> Sensor_emu::untilInput(int sequenceNumber) {
 }
 
 void Sensor_emu::handle(Gui &gui) {
-    ++this->sequenceNumber;
+    // draw rotary knobs as defined in config
     int count = config.size();
     bool changed = false;
     for (int i = 0; i < count; ++i) {
         auto &c = this->config[i];
 
-        // rotary knob on user interface
-        auto result = gui.widget<GuiRotaryKnob>(this->id + i, 50, 0.4, false);
+        // draw rotary knob on user interface and get interaction result
+        auto result = gui.widget<GuiRotaryKnob>(this->id + i,
+            50, // number of increments
+            0.4, // inner radius
+            false); // no button
 
+        // check if rotary knob was turned
         if (result.delta) {
             int delta = *result.delta;
             this->values[i] = std::clamp(this->values[i] + delta * c.step, c.min, c.max);
             changed = true;
         }
 
+        // draw value and unit onto rotary knob
         StringBuffer<16> buffer;
-        buffer << flt(this->values[i], c.decimalCount) << c.unit;
-
-        // draw text onto rotary knob
+        buffer << dec(this->values[i], c.decimalCount) << c.unit;
         float2 scale = float2{0.2, 0.2} / 150.0f;
         gui.drawText(tahoma16pt8bpp, this->id + i, scale, buffer);
 
     }
-    if (changed)
-        this->st.doAll(Events::READABLE);
+    if (changed) {
+        ++this->sequenceNumber;
+        this->st.notify(Events::READABLE);
+    }
 }
 
 } // namespace coco
