@@ -47,7 +47,7 @@ void Sensor_native::handle() {
         this->values[i] = c.initialValue + r;
     }
     //this->changeTasks.doAll();
-    this->st.doAll(Events::READABLE);
+    this->st.notify(Events::READABLE);
 
     this->loop.invoke(this->callback, this->interval);
 }

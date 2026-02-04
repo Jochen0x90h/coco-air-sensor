@@ -1,4 +1,5 @@
 #include "BME680.hpp"
+#include <coco/convert.hpp>
 #include <coco/debug.hpp>
 
 
@@ -12,8 +13,8 @@ namespace coco {
 constexpr uint8_t BME68X_REG_MEM_PAGE = 0x73;
 
 
-// page 0
-// ------
+// page 0 (0x80)
+// -------------
 
 // chip id
 constexpr uint8_t BME68X_REG_CHIP_ID = 0xD0;
@@ -27,13 +28,15 @@ constexpr uint8_t BME68X_SOFT_RESET_CMD = 0xB6;
 constexpr uint8_t BME68X_REG_COEFF1 = 0x8A;
 constexpr uint8_t BME68X_LEN_COEFF1 = 23;
 
+// 2nd group of coefficients
 constexpr uint8_t BME68X_REG_COEFF2 = 0xE1;
 constexpr uint8_t BME68X_LEN_COEFF2 = 14;
 
 
-// page 1
-// ------
+// page 1 (0x00)
+// -------------
 
+// 3rd group of coefficients
 constexpr uint8_t BME68X_REG_COEFF3 = 0x00;
 constexpr uint8_t BME68X_LEN_COEFF3 = 5;
 
@@ -48,7 +51,7 @@ constexpr uint8_t BME68X_REG_CTRL_MEAS = 0x74;
 constexpr uint8_t BME68X_REG_CONFIG = 0x75;
 
 
-constexpr uint8_t BME68X_LEN_COEFF_ALL = 42;
+constexpr uint8_t BME68X_LEN_COEFF_ALL = BME68X_LEN_COEFF1 + BME68X_LEN_COEFF2 + BME68X_LEN_COEFF3; // 42
 
 
 /* Macro to combine two 8 bit data's to form a 16 bit data */
@@ -419,11 +422,22 @@ float BME680::calc_gas_resistance_low(BME680 *dev, uint16_t gas_res_adc, uint8_t
     return calc_gas_res;
 }
 
+static void debugPrint(String name, const uint8_t *data, int length) {
+    debug::out << name << ":\n";
+    for (int i = 0; i < length; ++i) {
+        debug::out << "0x" << hex(data[i]) << ", ";
+        if ((i & 15) == 15)
+            debug::out << '\n';
+    }
+    debug::out << '\n';
+}
+
+// spi 0x80 for SPI mode and used in READ/WRITE macros
 Coroutine BME680::measure(int spi) {
     auto &buffer = this->buffer;
 
     // allocate header for read command
-    buffer.headerResize(1);
+    //buffer.headerResize(1);
 
     while (true) {
         // switch to register bank 0 when in SPI mode
@@ -439,7 +453,7 @@ Coroutine BME680::measure(int spi) {
         co_await buffer.write(1);
 
         // wait
-        co_await this->loop.sleep(5ms);
+        co_await this->loop.sleep(10ms);
 
         // read chip id and check if it is ok
         buffer.header<uint8_t>() = READ(BME68X_REG_CHIP_ID);
@@ -451,12 +465,20 @@ Coroutine BME680::measure(int spi) {
         co_await this->loop.sleep(1s);
     }
 
+    // debug: read bank 0
+    //uint8_t coefs[128];
+    //buffer.header<uint8_t>() = READ(128);
+    //co_await buffer.readData(coefs, 128);
+    //debugPrint("bank0", coefs, 128);
+
     // read calibration parameters
     uint8_t coeff_array[BME68X_LEN_COEFF_ALL];
     buffer.header<uint8_t>() = READ(BME68X_REG_COEFF1);
     co_await buffer.readData(coeff_array, BME68X_LEN_COEFF1);
     buffer.header<uint8_t>() = READ(BME68X_REG_COEFF2);
     co_await buffer.readData(&coeff_array[BME68X_LEN_COEFF1], BME68X_LEN_COEFF2);
+    //debugPrint("coeff1", coeff_array, BME68X_LEN_COEFF1);
+    //debugPrint("coeff2", &coeff_array[BME68X_LEN_COEFF1], BME68X_LEN_COEFF2);
 
     // switch to register bank 1 when in SPI mode
     if (spi) {
@@ -467,6 +489,7 @@ Coroutine BME680::measure(int spi) {
 
     buffer.header<uint8_t>() = READ(BME68X_REG_COEFF3);
     co_await buffer.readData(&coeff_array[BME68X_LEN_COEFF1 + BME68X_LEN_COEFF2], BME68X_LEN_COEFF3);
+    //debugPrint("coeff3", &coeff_array[BME68X_LEN_COEFF1 + BME68X_LEN_COEFF2], BME68X_LEN_COEFF3);
 
     get_calib_data(this, coeff_array);
 
@@ -508,6 +531,11 @@ Coroutine BME680::measure(int spi) {
         // wait until measurement is ready
         co_await this->loop.sleep(1s);
 
+        // debug: read bank 1
+        //buffer.header<uint8_t>() = READ(128);
+        //co_await buffer.readData(coefs, 128);
+        //debugPrint("bank1", coefs, 128);
+
         // read measurements
         buffer.header<uint8_t>() = READ(0x1D);
         co_await buffer.read(15);
@@ -525,20 +553,22 @@ Coroutine BME680::measure(int spi) {
 
             // measurements (5.3.4 Data registers)
             uint32_t temp_adc = buff[0x22] * 4096 | buff[0x23] * 16 | (buff[0x24] >> 4);
+            //debug::out << "temp_adc: " << dec(temp_adc) << "\n";
             uint32_t pres_adc = buff[0x1F] * 4096 | buff[0x20] * 16 | (buff[0x21] >> 4);
+            //debug::out << "pres_adc: " << dec(pres_adc) << "\n";
             uint16_t hum_adc = buff[0x25] * 256 | buff[0x26];
+            //debug::out << "hum_adc: " << dec(hum_adc) << "\n";
             uint16_t gas_res_adc = buff[0x2A] * 4 | (buff[0x2B] >> 6);
             uint8_t gas_range = buff[0x2B] & 0x0f;
             if (newData) {
                 ++this->sequenceNumber;
                 this->values[0] = calc_temperature(this, temp_adc);
+                this->values[2] = calc_pressure(this, pres_adc) * 0.01f; // convert Pa to hPa
                 this->values[1] = calc_humidity(this, hum_adc);
-                this->values[2] = calc_pressure(this, pres_adc) * 0.01f;
                 this->values[3] = calc_gas_resistance_low(this, gas_res_adc, gas_range);
 
                 // notify that new data is available
-                //this->changeTasks.doAll();
-                this->st.doAll(Events::READABLE);
+                this->st.notify(Events::READABLE);
             }
         }
 
